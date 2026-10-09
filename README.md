@@ -14,7 +14,7 @@ Latency claims without load curves are marketing, not engineering.
 
 ## Status
 
-Scaffolded. Concept notes and the first implementation are in progress; results land in `results/` once the GPU runs are done.
+Concept primer written (`CONCEPTS.md`). Implementation starts next; results land in `results/` once the GPU runs are done.
 
 ## Layout
 
