@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
+import sys
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -86,9 +87,16 @@ async def _one(client: httpx.AsyncClient, cfg: RunConfig, prompt: str, max_token
                                 seed=cfg.seed, system=cfg.system_prompt, extra_headers=cfg.extra_headers)
 
 
-async def _closed(client: httpx.AsyncClient, cfg: RunConfig, records: list[RequestRecord]) -> None:
+async def _closed(client: httpx.AsyncClient, cfg: RunConfig, records: list[RequestRecord]) -> int | None:
+    """Returns the original num_requests if it had to be raised, else None."""
     assert cfg.num_requests, "closed loop needs num_requests"
-    remaining = cfg.num_requests
+    adjusted_from = None
+    n = cfg.num_requests
+    if n < cfg.level:
+        # Fewer requests than workers measures a smaller concurrency than claimed.
+        adjusted_from, n = n, int(cfg.level) * 2
+        print(f"closed loop: num_requests {adjusted_from} < concurrency {int(cfg.level)}; raised to {n}", file=sys.stderr)
+    remaining = n
 
     async def worker():
         nonlocal remaining
@@ -98,6 +106,7 @@ async def _closed(client: httpx.AsyncClient, cfg: RunConfig, records: list[Reque
             records.append(await _one(client, cfg, prompt, n))
 
     await asyncio.gather(*[worker() for _ in range(int(cfg.level))])
+    return adjusted_from
 
 
 async def _open(client: httpx.AsyncClient, cfg: RunConfig, records: list[RequestRecord]) -> None:
@@ -130,8 +139,9 @@ async def run_level(base_url: str, cfg: RunConfig) -> dict:
         stop = asyncio.Event()
         t0 = time.monotonic()
         sampler = asyncio.create_task(_sample_metrics(client, cfg.metrics_interval_s, timeline, stop, t0))
+        adjusted_from = None
         if cfg.mode == "closed":
-            await _closed(client, cfg, records)
+            adjusted_from = await _closed(client, cfg, records)
         elif cfg.mode == "open":
             await _open(client, cfg, records)
         else:
@@ -142,6 +152,7 @@ async def run_level(base_url: str, cfg: RunConfig) -> dict:
 
     out = {"mode": cfg.mode, "level": cfg.level, "warmup_requests": cfg.warmup_requests,
            **aggregate(records, wall, cfg.slo)}
+    out["num_requests_adjusted_from"] = adjusted_from
     out["metrics_timeline"] = timeline
     out["per_request"] = [
         {"t_start": r.t_start - t0, "ttft_s": r.ttft_s, "tpot_s": r.tpot_s, "e2e_s": r.e2e_s,

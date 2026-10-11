@@ -78,3 +78,14 @@ def test_run_level_reports_goodput_when_slo_given(live_mock):
     with live_mock(ttft_ms=10, itl_ms=2) as url:
         out = asyncio.run(run_level(url, cfg))
     assert out["slo_pass_rate"] == 1.0 and out["goodput_requests_per_s"] > 0
+
+
+def test_closed_loop_raises_num_requests_to_cover_concurrency(live_mock, capsys):
+    # 64 workers with 32 requests would silently measure concurrency 32 (seen on the first T4 run).
+    cfg = RunConfig(model="mock", mode="closed", level=8, num_requests=4, warmup_requests=0,
+                    prompts=fixed_prompts(5, 2), metrics_interval_s=0.02)
+    with live_mock(ttft_ms=5, itl_ms=1, capacity=64) as url:
+        out = asyncio.run(run_level(url, cfg))
+    assert out["requests"] == 16                      # raised to 2 x concurrency
+    assert out["num_requests_adjusted_from"] == 4
+    assert "raised" in capsys.readouterr().err
