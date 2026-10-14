@@ -24,6 +24,9 @@ WATCHED = {
     "waiting": ("vllm:num_requests_waiting",),
     "kv_cache_usage": ("vllm:kv_cache_usage_perc", "vllm:gpu_cache_usage_perc"),
     "generation_tokens_total": ("vllm:generation_tokens_total",),
+    "preemptions": ("vllm:num_preemptions_total",),
+    "prefix_cache_queries": ("vllm:prefix_cache_queries_total",),
+    "prefix_cache_hits": ("vllm:prefix_cache_hits_total",),
 }
 
 

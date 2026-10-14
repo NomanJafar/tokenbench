@@ -89,3 +89,14 @@ def test_closed_loop_raises_num_requests_to_cover_concurrency(live_mock, capsys)
     assert out["requests"] == 16                      # raised to 2 x concurrency
     assert out["num_requests_adjusted_from"] == 4
     assert "raised" in capsys.readouterr().err
+
+
+def test_metrics_sampler_records_preemptions_and_prefix_cache_series():
+    from tokenbench.load import WATCHED, parse_prometheus
+    text = ("vllm:num_preemptions_total{m=\"x\"} 4\n"
+            "vllm:prefix_cache_queries_total{m=\"x\"} 100\n"
+            "vllm:prefix_cache_hits_total{m=\"x\"} 60\n"
+            "vllm:kv_cache_usage_perc{m=\"x\"} 0.5\n")
+    raw = parse_prometheus(text)
+    picked = {short: next((raw[n] for n in names if n in raw), None) for short, names in WATCHED.items()}
+    assert picked["preemptions"] == 4 and picked["prefix_cache_queries"] == 100 and picked["prefix_cache_hits"] == 60
