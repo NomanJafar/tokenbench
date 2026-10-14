@@ -100,3 +100,12 @@ def test_metrics_sampler_records_preemptions_and_prefix_cache_series():
     raw = parse_prometheus(text)
     picked = {short: next((raw[n] for n in names if n in raw), None) for short, names in WATCHED.items()}
     assert picked["preemptions"] == 4 and picked["prefix_cache_queries"] == 100 and picked["prefix_cache_hits"] == 60
+
+
+def test_stream_request_keeps_response_headers_in_meta(live_mock):
+    async def go(url):
+        async with httpx.AsyncClient(base_url=url) as c:
+            return await stream_request(c, "mock", "a b", max_tokens=2)
+    with live_mock(ttft_ms=1, itl_ms=1) as url:
+        r = asyncio.run(go(url))
+    assert r.meta["headers"]["content-type"].startswith("text/event-stream")

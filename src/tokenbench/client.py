@@ -43,12 +43,14 @@ async def stream_request(
     token_times: list[float] = []
     usage: dict | None = None
     status = None
+    headers: dict = {}
     error = None
     n_chunks = 0
     t_start = time.monotonic()
     try:
         async with client.stream("POST", "/v1/chat/completions", json=body, headers=extra_headers, timeout=None) as resp:
             status = resp.status_code
+            headers = {k.lower(): v for k, v in resp.headers.items()}
             if status != 200:
                 error = f"HTTP {status}: {(await resp.aread())[:200].decode(errors='replace')}"
             else:
@@ -70,5 +72,5 @@ async def stream_request(
         prompt_tokens=usage.get("prompt_tokens") if usage else None,
         completion_tokens=usage.get("completion_tokens") if usage else n_chunks,
         error=error,
-        meta={"status": status, "max_tokens": max_tokens, "chunks": n_chunks},
+        meta={"status": status, "max_tokens": max_tokens, "chunks": n_chunks, "headers": headers},
     )
