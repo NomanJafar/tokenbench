@@ -131,3 +131,11 @@ def test_open_loop_client_is_not_capped_at_httpx_default_100_connections():
     c = make_client("http://x", RunConfig(model="m"))
     pool = c._transport._pool
     assert pool._max_connections is None or pool._max_connections >= 1000
+
+
+def test_unique_prompts_share_no_prefix_but_keep_the_length():
+    from tokenbench.prompts import unique_prompts
+    src = unique_prompts(prompt_tokens=200, max_tokens=8, seed=3)
+    a, b = next(src)[0], next(src)[0]
+    assert a != b and a.split()[:4] != b.split()[:4]          # different from the first block on
+    assert 180 <= len(a.split()) <= 220 and next(src)[1] == 8

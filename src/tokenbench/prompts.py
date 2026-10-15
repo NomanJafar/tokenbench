@@ -28,6 +28,18 @@ def fixed_prompts(prompt_tokens: int, max_tokens: int) -> Iterator[tuple[str, in
         yield text, max_tokens
 
 
+def unique_prompts(prompt_tokens: int, max_tokens: int, seed: int = 0) -> Iterator[tuple[str, int]]:
+    """Fixed-length prompts that share no prefix with each other: a per-request nonce first,
+    then shuffled filler. Use these when the server has prefix caching on and the experiment
+    must pay full prefill every time (fixed_prompts would be served from cache after request 1)."""
+    rng = random.Random(seed)
+    i = 0
+    while True:
+        words = [f"req{i}-{rng.randrange(10**9)}"] + [rng.choice(_FILLER) for _ in range(prompt_tokens - 1)]
+        yield " ".join(words), max_tokens
+        i += 1
+
+
 def load_sample_rows() -> list[dict]:
     with resources.files("tokenbench.data").joinpath("sample_prompts.jsonl").open() as f:
         return [json.loads(line) for line in f if line.strip()]

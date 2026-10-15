@@ -13,7 +13,7 @@ from pathlib import Path
 import tokenbench
 from tokenbench.load import RunConfig, run_level
 from tokenbench.metrics import SLO
-from tokenbench.prompts import fixed_prompts, sample_prompts
+from tokenbench.prompts import fixed_prompts, sample_prompts, unique_prompts
 from tokenbench.report import markdown_summary, plot_run, write_run
 
 
@@ -32,7 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="closed loop: requests per level (default: 4 x concurrency, min 16)")
     s.add_argument("--duration", type=float, default=30.0, help="open loop: seconds per level")
     s.add_argument("--warmup", type=int, default=4, help="warm-up requests per level, discarded")
-    s.add_argument("--prompts", choices=["fixed", "sample"], default="fixed")
+    s.add_argument("--prompts", choices=["fixed", "unique", "sample"], default="fixed",
+                   help="fixed: one prompt for all (prefix-cache friendly); unique: same length, no shared prefix; sample: bundled distribution")
     s.add_argument("--prompt-tokens", type=int, default=256)
     s.add_argument("--max-tokens", type=int, default=128)
     s.add_argument("--no-ignore-eos", action="store_true", help="let the model stop naturally")
@@ -67,6 +68,8 @@ def _slo(a) -> SLO | None:
 def _prompts(a):
     if a.prompts == "sample":
         return sample_prompts(seed=a.seed, max_output_tokens=a.max_tokens)
+    if a.prompts == "unique":
+        return unique_prompts(a.prompt_tokens, a.max_tokens, seed=a.seed)
     return fixed_prompts(a.prompt_tokens, a.max_tokens)
 
 
