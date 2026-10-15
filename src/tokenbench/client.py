@@ -29,6 +29,7 @@ async def stream_request(
     seed: int | None = 0,
     system: str | None = None,
     extra_headers: dict | None = None,
+    request_timeout_s: float | None = None,
 ) -> RequestRecord:
     messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
     body: dict = {
@@ -48,7 +49,8 @@ async def stream_request(
     n_chunks = 0
     t_start = time.monotonic()
     try:
-        async with client.stream("POST", "/v1/chat/completions", json=body, headers=extra_headers, timeout=None) as resp:
+        async with client.stream("POST", "/v1/chat/completions", json=body, headers=extra_headers,
+                                 timeout=httpx.Timeout(request_timeout_s)) as resp:
             status = resp.status_code
             headers = {k.lower(): v for k, v in resp.headers.items()}
             if status != 200:
@@ -66,6 +68,8 @@ async def stream_request(
                         usage = obj["usage"]
     except httpx.HTTPError as e:
         error = f"{type(e).__name__}: {e}"
+    except TimeoutError:
+        error = "request timeout"
     t_end = time.monotonic()
     return RequestRecord(
         t_start=t_start, token_times=token_times, t_end=t_end,

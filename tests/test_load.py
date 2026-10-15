@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import statistics
+import time
 
 import httpx
 
@@ -109,3 +110,15 @@ def test_stream_request_keeps_response_headers_in_meta(live_mock):
     with live_mock(ttft_ms=1, itl_ms=1) as url:
         r = asyncio.run(go(url))
     assert r.meta["headers"]["content-type"].startswith("text/event-stream")
+
+
+def test_closed_loop_request_timeout_records_an_error_instead_of_hanging(live_mock):
+    # A server that never finishes a request must not wedge a closed-loop sweep (seen on Kaggle when
+    # a prompt could not be scheduled). ttft 5 s against a 0.3 s request timeout -> error, fast.
+    cfg = RunConfig(model="mock", mode="closed", level=2, num_requests=2, warmup_requests=0,
+                    prompts=fixed_prompts(5, 2), request_timeout_s=0.3)
+    with live_mock(ttft_ms=5000, itl_ms=1) as url:
+        t0 = time.monotonic()
+        out = asyncio.run(run_level(url, cfg))
+    assert out["errors"] == 2 and time.monotonic() - t0 < 3
+    assert "timeout" in out["per_request"][0]["error"].lower()

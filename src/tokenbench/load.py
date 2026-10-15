@@ -46,6 +46,7 @@ class RunConfig:
     system_prompt: str | None = None
     extra_headers: dict | None = None
     drain_timeout_s: float = 120.0
+    request_timeout_s: float | None = 300.0   # a wedged server must not hang a closed loop forever
 
 
 _PROM_LINE = re.compile(r"^([A-Za-z_:][A-Za-z0-9_:]*)(?:\{[^}]*\})?\s+(\S+)")
@@ -87,7 +88,8 @@ async def _sample_metrics(client: httpx.AsyncClient, interval_s: float, out: lis
 
 async def _one(client: httpx.AsyncClient, cfg: RunConfig, prompt: str, max_tokens: int) -> RequestRecord:
     return await stream_request(client, cfg.model, prompt, max_tokens, ignore_eos=cfg.ignore_eos,
-                                seed=cfg.seed, system=cfg.system_prompt, extra_headers=cfg.extra_headers)
+                                seed=cfg.seed, system=cfg.system_prompt, extra_headers=cfg.extra_headers,
+                                request_timeout_s=cfg.request_timeout_s)
 
 
 async def _closed(client: httpx.AsyncClient, cfg: RunConfig, records: list[RequestRecord]) -> int | None:

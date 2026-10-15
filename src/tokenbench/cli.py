@@ -42,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--slo-tpot-ms", type=float, default=None)
     s.add_argument("--metrics-interval", type=float, default=0.5)
     s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--request-timeout", type=float, default=300.0, help="seconds per request before it counts as an error")
     s.add_argument("--plots", action="store_true", help="also write PNG plots (needs matplotlib)")
 
     m = sub.add_parser("mockserver", help="run the OpenAI-compatible mock server")
@@ -93,7 +94,7 @@ def run_sweep(a, argv: list[str]) -> dict:
             duration_s=a.duration if a.mode == "open" else None,
             warmup_requests=a.warmup, prompts=_prompts(a), ignore_eos=not a.no_ignore_eos,
             slo=_slo(a), metrics_interval_s=a.metrics_interval, seed=a.seed,
-            system_prompt=a.system_prompt, extra_headers=headers,
+            system_prompt=a.system_prompt, extra_headers=headers, request_timeout_s=a.request_timeout,
         )
         res = asyncio.run(run_level(a.base_url, cfg))
         run["levels"].append(res)
