@@ -47,6 +47,7 @@ class RunConfig:
     extra_headers: dict | None = None
     drain_timeout_s: float = 120.0
     request_timeout_s: float | None = 300.0   # a wedged server must not hang a closed loop forever
+    max_connections: int | None = 2000        # httpx defaults to 100, which caps open-loop concurrency silently
 
 
 _PROM_LINE = re.compile(r"^([A-Za-z_:][A-Za-z0-9_:]*)(?:\{[^}]*\})?\s+(\S+)")
@@ -133,8 +134,13 @@ async def _open(client: httpx.AsyncClient, cfg: RunConfig, records: list[Request
                                  completion_tokens=0, error="drain timeout") for _ in pending)
 
 
+def make_client(base_url: str, cfg: RunConfig) -> httpx.AsyncClient:
+    limits = httpx.Limits(max_connections=cfg.max_connections, max_keepalive_connections=cfg.max_connections)
+    return httpx.AsyncClient(base_url=base_url, timeout=None, limits=limits)
+
+
 async def run_level(base_url: str, cfg: RunConfig) -> dict:
-    async with httpx.AsyncClient(base_url=base_url, timeout=None) as client:
+    async with make_client(base_url, cfg) as client:
         for _ in range(cfg.warmup_requests):
             prompt, n = next(cfg.prompts)
             await _one(client, cfg, prompt, n)

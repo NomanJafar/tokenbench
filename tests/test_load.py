@@ -122,3 +122,12 @@ def test_closed_loop_request_timeout_records_an_error_instead_of_hanging(live_mo
         out = asyncio.run(run_level(url, cfg))
     assert out["errors"] == 2 and time.monotonic() - t0 < 3
     assert "timeout" in out["per_request"][0]["error"].lower()
+
+
+def test_open_loop_client_is_not_capped_at_httpx_default_100_connections():
+    # An open loop at 6 req/s with 15 s requests needs ~90 connections; the httpx default pool of
+    # 100 silently queued requests in a T4 run and showed up as 20 s "TTFT". The pool must be large.
+    from tokenbench.load import make_client
+    c = make_client("http://x", RunConfig(model="m"))
+    pool = c._transport._pool
+    assert pool._max_connections is None or pool._max_connections >= 1000
